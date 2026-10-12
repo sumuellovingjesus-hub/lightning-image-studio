@@ -8,9 +8,10 @@
 功能：
   1. 检测本机环境（系统 / Python / 磁盘 / 内存）
   2. 自动识别本机已安装的 ComfyUI（支持手动指定路径）
-  3. 自动识别已就位的模型，缺失模型可选择性自动下载
+  3. 全盘扫描本机已安装的全部模型，按类型自动识别并给出运行方案
+     （不依赖任何内置模型清单；仅当本机无模型时才提供可选择的推荐下载）
   4. 安装「闪电生图台」可视化控制面板并生成启动器
-  5. 全程 Yes/No 交互确认，安装日志落盘可追溯
+  5. 全程 Y/N 交互确认，安装日志落盘可追溯
 
 许可：MIT License — 详见 README.md
 """
@@ -19,6 +20,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -29,7 +31,7 @@ import urllib.error
 
 APP_NAME = "闪电生图台"
 APP_EN_NAME = "Lightning Image Studio"
-APP_VERSION = "4.0.0"
+APP_VERSION = "4.1.0"
 BRAND = "闪电研究院 Lightning Research Institute"
 WEBSITE = "https://shandianhub.cn"
 AUTHOR = "Samuel"
@@ -67,8 +69,26 @@ COMFY_CANDIDATES = [
 MODEL_DIR_CHECKPOINTS = os.path.join("models", "checkpoints")
 MODEL_DIR_UPSCALE = os.path.join("models", "upscale_models")
 
-# 模型清单：key -> (相对路径, 名称, 大小说明, 许可, 下载源列表)
-MODEL_CATALOG = {
+# 全盘扫描的模型类别（相对 models/ 目录, 展示名）
+MODEL_SUBDIRS = [
+    ("checkpoints",      "生成模型 (Checkpoint)"),
+    ("diffusion_models", "扩散模型 (DiT/UNet)"),
+    ("text_encoders",    "文本编码器"),
+    ("vae",              "VAE 解码器"),
+    ("upscale_models",   "超分放大模型"),
+    ("loras",            "LoRA 微调模型"),
+]
+
+# 生成模型类型自动识别规则与对应运行方案
+CLS_INFO = {
+    "fast":    ("极速型",   "建议 4 步 / CFG 1.0，出图最快（Turbo / Lightning / Hyper / LCM 类）"),
+    "xl":      ("高清型",   "建议 25 步 / CFG 7，原生 1024px（SDXL 类）"),
+    "sd15":    ("经典型",   "建议 20 步 / CFG 7，原生 512–768px（SD 1.5 类）"),
+    "generic": ("通用型",   "建议 20 步 / CFG 6.5（未识别类型，可自行在面板微调）"),
+}
+
+# 推荐模型清单：仅当本机未检测到可用生成模型时作为「可选项」提供，绝非内置必需
+RECOMMENDED_MODELS = {
     "sd_turbo.safetensors": {
         "dir": MODEL_DIR_CHECKPOINTS,
         "name": "SD-Turbo 极速模型（约 5.2 GB，出图 35-60 秒）",
@@ -272,12 +292,51 @@ def comfyui_version(path):
 # ─────────────────────────── 模型检测 ───────────────────────────
 
 def scan_models(comfy_path):
-    """返回 {模型文件名: 绝对路径或None}"""
-    found = {}
-    for fname, meta in MODEL_CATALOG.items():
-        full = os.path.join(comfy_path, meta["dir"], fname)
-        found[fname] = full if os.path.isfile(full) else None
-    return found
+    """全盘递归扫描 models/ 各类别目录。
+    返回 {类别: [(文件名, 字节数, 绝对路径), ...]}（仅列有效模型文件）。"""
+    result = {}
+    for sub, _label in MODEL_SUBDIRS:
+        root = os.path.join(comfy_path, "models", sub)
+        items = []
+        if os.path.isdir(root):
+            for dirpath, _dirs, filenames in os.walk(root):
+                for fn in sorted(filenames):
+                    if fn.startswith(".") or fn.endswith((".part", ".txt", ".json", ".md")):
+                        continue
+                    p = os.path.join(dirpath, fn)
+                    try:
+                        sz = os.path.getsize(p)
+                    except OSError:
+                        continue
+                    if sz < 512 * 1024:      # 忽略占位/缓存小文件
+                        continue
+                    items.append((fn, sz, p))
+        if items:
+            result[sub] = sorted(items)
+    return result
+
+
+def classify_ckpt(name):
+    """按文件名自动识别生成模型类型 → CLS_INFO 键。"""
+    n = name.lower()
+    if re.search(r"turbo|lightning|hyper|lcm|ssd-1b|schnell", n):
+        return "fast"
+    if "xl" in n:
+        return "xl"
+    if re.search(r"v1-5|sd15|sd_1\.5|sd-v1|stable[-_]?diffusion[-_]?v?1", n):
+        return "sd15"
+    return "generic"
+
+
+def pick_default(ckpt_names):
+    """自动方案：优先极速型，其次高清型、经典型，再次任意第一个。"""
+    if not ckpt_names:
+        return None
+    for want in ("fast", "xl", "sd15", "generic"):
+        for n in ckpt_names:
+            if classify_ckpt(n) == want:
+                return n
+    return ckpt_names[0]
 
 
 # ─────────────────────────── 下载 ───────────────────────────
@@ -347,8 +406,8 @@ def download(url, dest, min_size=1024):
 
 
 def download_model(fname, comfy_path):
-    """按目录清单下载单个模型，多源自动回退。"""
-    meta = MODEL_CATALOG[fname]
+    """按推荐清单下载单个模型，多源自动回退。"""
+    meta = RECOMMENDED_MODELS[fname]
     dest_dir = os.path.join(comfy_path, meta["dir"])
     os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, fname)
@@ -459,7 +518,7 @@ exit 1
 '''
 
 
-def install_app(comfy_path, install_dir):
+def install_app(comfy_path, install_dir, detected, plan_default):
     """复制应用文件、写配置、生成启动器。"""
     os.makedirs(install_dir, exist_ok=True)
     os.makedirs(os.path.join(install_dir, "app"), exist_ok=True)
@@ -510,7 +569,7 @@ def install_app(comfy_path, install_dir):
     else:
         info(f"检测到内存 {mem_gb:.0f} GB，使用标准参数")
 
-    # 写配置
+    # 写配置（含本机模型自动识别结果，面板据此自动匹配方案）
     config = {
         "app": APP_NAME,
         "version": APP_VERSION,
@@ -520,6 +579,9 @@ def install_app(comfy_path, install_dir):
         "comfyui_args": args,
         "comfyui_port": COMFY_PORT,
         "panel_port": PANEL_PORT,
+        "detected_models": {sub: [fn for fn, _s, _p in items]
+                            for sub, items in detected.items()},
+        "default_checkpoint": plan_default,
     }
     conf_path = os.path.join(install_dir, "config.json")
     with open(conf_path, "w", encoding="utf-8") as f:
@@ -539,8 +601,10 @@ def install_app(comfy_path, install_dir):
 # ─────────────────────────── 主流程 ───────────────────────────
 
 LICENSE_TEXT = f"""  本软件基于 MIT 许可证开源发布，随附源码可自由查看、修改与分发。
-  内置 AI 模型遵循各自开源许可（CreativeML OpenRAIL++ / BSD-3），
-  请遵守相应条款使用生成内容，勿用于违法违规用途。
+  本程序不内置任何 AI 模型：安装时全盘识别您本机已装的模型；
+  若选择下载推荐模型，这些模型遵循各自开源许可
+  （如 CreativeML OpenRAIL++ / BSD-3），请遵守相应条款使用生成内容，
+  勿用于违法违规用途。
 
   隐私说明：本程序与生成的图像均仅存在于您的本机，不收集、
   不上传任何个人数据。中文提示词翻译经由第三方免费翻译接口
@@ -610,26 +674,70 @@ def main():
         else:
             confirm_abort()
 
-    # ── STEP 3 检测模型 ──
-    step(3, TOTAL, "检测生成模型")
-    models = scan_models(comfy)
-    found_list, missing_list = [], []
-    for fname, path in models.items():
-        if path:
-            ok(f"{fname}  {paint(human_size(os.path.getsize(path)), C_DIM)}")
-            found_list.append(fname)
+    # ── STEP 3 检测模型（全盘扫描 + 自动方案）──
+    step(3, TOTAL, "检测本机模型（全盘自动识别）")
+    detected = scan_models(comfy)
+    total_models = sum(len(v) for v in detected.values())
+    if total_models:
+        ok(f"共识别到 {total_models} 个模型文件，分类如下：")
+        for sub, label in MODEL_SUBDIRS:
+            items = detected.get(sub)
+            if not items:
+                continue
+            print(f"\n    {paint(label, C_BOLD)}  （{len(items)} 个）")
+            for fn, sz, _p in items:
+                tag = ""
+                if sub == "checkpoints":
+                    cls = classify_ckpt(fn)
+                    tag = paint(f"  → {CLS_INFO[cls][0]}", C_CYAN)
+                print(f"      · {fn}  {paint(human_size(sz), C_DIM)}{tag}")
+    else:
+        warn("models/ 目录下未检测到任何模型文件。")
+
+    # 自动方案：选定默认模型与参数档位
+    ckpt_names = [fn for fn, _s, _p in detected.get("checkpoints", [])]
+    plan_default = pick_default(ckpt_names)
+    if plan_default:
+        cls = classify_ckpt(plan_default)
+        print()
+        ok(f"自动方案：默认使用「{plan_default}」（{CLS_INFO[cls][0]}）")
+        info(f"参数方案：{CLS_INFO[cls][1]}")
+        info("面板会自动识别全部已就位模型并在打开时选中默认模型，可随时切换。")
+        if detected.get("upscale_models"):
+            ok("超分放大：已检测到，可在面板中勾选 ×4 放大")
         else:
-            desc = MODEL_CATALOG[fname]["name"].split("（")[0]
-            warn(f"缺失：{fname}（{desc}）")
-            missing_list.append(fname)
-    for fname in missing_list:
-        meta = MODEL_CATALOG[fname]
-        print(f"\n  缺失模型：{meta['name']}")
-        info(f"开源许可：{meta['license']}")
-        if ask_yes_no(f"是否自动下载 {fname}？", default_yes=True):
-            download_model(fname, comfy)
-    if not missing_list:
-        ok("所有必需模型均已就位，无需下载")
+            warn("未检测到超分放大模型，面板中 ×4 放大将不可用")
+            if ask_yes_no("是否下载推荐的超分放大器 RealESRGAN（约 64 MB，可选）？", default_yes=False):
+                download_model("RealESRGAN_x4plus.pth", comfy)
+    else:
+        warn("没有可用的生成模型（Checkpoint），面板暂时无法出图。")
+        print(f"\n  可从推荐清单选择下载（完全可选，也可稍后自行放入 models/checkpoints/ 目录）：")
+        opts = list(RECOMMENDED_MODELS.items())
+        for i, (_fname, meta) in enumerate(opts, 1):
+            print(f"    {i}. {meta['name']}")
+            info(f"开源许可：{meta['license']}")
+        print("     0. 跳过，暂不下载任何模型")
+        while True:
+            c = input(f"  {paint('?', C_CYAN)} 请输入编号（多选用逗号分隔，默认 0）: ").strip() or "0"
+            try:
+                picks = [int(x) for x in c.replace("，", ",").split(",")]
+                if all(0 <= x <= len(opts) for x in picks):
+                    break
+            except ValueError:
+                pass
+            print(f"  {paint('输入无效，请重新输入。', C_YELLOW)}")
+        for x in picks:
+            if x:
+                download_model(opts[x - 1][0], comfy)
+        # 下载后重新扫描并更新方案
+        detected = scan_models(comfy)
+        ckpt_names = [fn for fn, _s, _p in detected.get("checkpoints", [])]
+        plan_default = pick_default(ckpt_names)
+        if plan_default:
+            cls = classify_ckpt(plan_default)
+            ok(f"自动方案更新：默认使用「{plan_default}」（{CLS_INFO[cls][0]}）")
+        else:
+            warn("仍无生成模型——可随时把模型放入 models/checkpoints/ 后重新运行安装器。")
 
     # ── STEP 4 安装面板 ──
     step(4, TOTAL, "安装可视化控制面板")
@@ -637,16 +745,18 @@ def main():
     d = input(f"  安装位置（回车使用默认 {default_dir}）: ").strip() or default_dir
     d = os.path.expanduser(d)
     print()
-    conf, launch = install_app(comfy, d)
+    conf, launch = install_app(comfy, d, detected, plan_default)
 
     # ── STEP 5 汇总确认 ──
     step(5, TOTAL, "安装结果汇总")
+    total_models = sum(len(v) for v in detected.values())
     print(f"""
     {paint('安装位置', C_BOLD)}     {d}
     {paint('面板地址', C_BOLD)}     http://127.0.0.1:{PANEL_PORT}
     {paint('ComfyUI', C_BOLD)}      {comfy}
     {paint('启动方式', C_BOLD)}     双击「启动闪电生图台.command」或在终端运行
-    {paint('已就位模型', C_BOLD)}   {len(found_list)}/{len(MODEL_CATALOG)}（{'、'.join(found_list) or '无'}）
+    {paint('识别模型', C_BOLD)}     {total_models} 个（本机自动识别）
+    {paint('默认模型', C_BOLD)}     {plan_default or '无（放入模型后重新运行安装器即可识别）'}
 """)
     if not ask_yes_no("确认以上信息无误？", default_yes=True):
         confirm_abort()

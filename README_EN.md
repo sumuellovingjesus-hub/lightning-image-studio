@@ -65,13 +65,21 @@ Daily use: run the generated `启动闪电生图台.command`, then open `http://
 
 > Machines with ≤ 16 GB RAM automatically get low-memory flags (`--lowvram --cache-none`).
 
-## 📦 Bundled Models
+## 📦 Models: Zero Bundled, Fully Auto-Detected
 
-| Model | Purpose | Speed (16GB M4) | License |
-|-------|---------|-----------------|---------|
-| SD-Turbo | Fast generation (default) | 5–60 s/image | CreativeML OpenRAIL++-M |
-| SDXL Base 1.0 | Hi-res + 4K upscale | 5–15 min/image | CreativeML OpenRAIL++-M |
-| RealESRGAN ×4+ | Upscaler | seconds | BSD-3-Clause |
+This program **does not bundle any models**. Both the installer and the panel scan your local ComfyUI `models/` directories and support whatever they find, auto-classifying each model and matching a parameter preset by filename:
+
+| Detected class | Auto-matched preset | Speed (16GB M4, measured) |
+|------|------|------|
+| Fast (Turbo / Lightning / Hyper / LCM) | 4 steps / CFG 1.0 | 5–60 s/image |
+| Hi-res (SDXL) | 25 steps / CFG 7, native 1024px | 5–15 min/image |
+| Classic (SD 1.5) | 20 steps / CFG 7, native 512–768px | dozens of seconds–minutes |
+| Generic (unrecognized) | 20 steps / CFG 6.5, fine-tune in panel | varies |
+| Z-Image (DiT + Qwen encoder, native Chinese) | 8 steps / CFG 1.0 | ~90 min/image (not recommended on 16GB) |
+
+- Whatever checkpoints exist locally become panel buttons; the fast one is picked as default automatically
+- Upscale models (e.g. RealESRGAN ×4) are auto-detected too — the ×4 option appears only when one exists
+- With no models present, the installer offers a **fully optional** recommendation list (with license info), or you can drop models into `models/checkpoints/` later
 
 ## 📖 Docs (Chinese)
 

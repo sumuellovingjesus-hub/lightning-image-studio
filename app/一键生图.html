@@ -116,7 +116,7 @@
   .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
 
-  .models{display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; background:var(--field);
+  .models{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:5px; background:var(--field);
     border:1px solid var(--line); border-radius:15px; padding:5px; box-shadow:var(--inset)}
   .models button{padding:11px 4px 10px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;
     border-radius:11px; border:none; background:transparent; color:var(--dim); transition:all .3s var(--ease)}
@@ -216,7 +216,7 @@
 <div class="bgfx"><i></i><i></i><i></i></div>
 <header>
   <div class="logo"></div>
-  <h1><span data-i18n="appTitle">闪电生图台</span><em data-i18n="appSub">极速生图 · 全参数可调 · v4.0</em></h1>
+  <h1><span data-i18n="appTitle">闪电生图台</span><em data-i18n="appSub">极速生图 · 全参数可调 · v4.1</em></h1>
   <div class="sp"></div>
   <div class="dot" id="svcDot"><i></i><em id="svcTxt" style="font-style:normal" data-i18n="svcChecking">检测服务中…</em></div>
   <a class="hbtn" id="langBtn" href="javascript:void(0)" title="切换语言 / Switch language">EN</a>
@@ -232,11 +232,7 @@
 <div class="wrap">
   <div class="glass card">
     <h2 data-i18n="secModel">模 型</h2>
-    <div class="models">
-      <button id="mZ">Z-Image<small data-i18n="mZs">中文原生 · 极慢</small></button>
-      <button id="mT" class="on">Turbo<small data-i18n="mTs">极速 · 推荐</small></button>
-      <button id="mX">SDXL<small data-i18n="mXs">高清 · 英文</small></button>
-    </div>
+    <div class="models" id="modelBtns"></div>
     <div class="note" id="modelNote"></div>
 
     <h2 data-i18n="secScene">画 面</h2>
@@ -267,7 +263,7 @@
       <div><label data-i18n="labelSeed">种子（0 = 随机）</label><input type="number" id="seed" value="0" min="0"></div>
       <div style="align-self:end"><button class="btnmini" id="rand" style="width:100%" data-i18n="randSeed">换随机种子</button></div>
     </div>
-    <label class="switch"><input type="checkbox" id="up"> <span data-i18n="upLabel">追加 RealESRGAN 超分放大 ×4</span></label>
+    <label class="switch"><input type="checkbox" id="up"> <span data-i18n="upLabel">追加 AI 超分放大 ×4</span></label>
 
     <button id="go" data-i18n="go">生 成</button>
     <div id="status"></div>
@@ -295,7 +291,7 @@
 <footer>
   <span data-i18n="footerBrand">闪电研究院 Lightning Research Institute · 出品</span> ·
   <a href="https://shandianhub.cn" target="_blank">shandianhub.cn</a> ·
-  <span data-i18n="footerLocal">本地运行 · 不上传任何数据</span> · v4.0
+  <span data-i18n="footerLocal">本地运行 · 不上传任何数据</span> · v4.1
 </footer>
 
 <!-- 设置中心 -->
@@ -317,7 +313,7 @@
     </div>
     <div class="setrow">
       <div class="lb" data-i18n="setDefModel">默认模型<small>打开页面时选中的模型</small></div>
-      <select id="setDefModel"><option value="turbo">Turbo</option><option value="sdxl">SDXL</option><option value="zimage">Z-Image</option></select>
+      <select id="setDefModel"></select>
     </div>
     <div class="setrow">
       <div class="lb" data-i18n="setDefUp">默认超分<small>默认勾选 ×4 放大</small></div>
@@ -336,24 +332,24 @@
 
 <script>
 const $ = id => document.getElementById(id);
-let mode = "turbo", curList = [];
+let curList = [];
 
 /* ───────── i18n 中英字典 ───────── */
 const I18N = {
   zh: {
-    appTitle:"闪电生图台", appSub:"极速生图 · 全参数可调 · v4.0",
+    appTitle:"闪电生图台", appSub:"极速生图 · 全参数可调 · v4.1",
     svcChecking:"检测服务中…", svcOnline:"服务在线", svcOffline:"服务离线 · 请运行启动器",
     origBtn:"ComfyUI 原版界面", origBtnTip:"在新标签页打开 ComfyUI 原版工作流面板，可查看节点、连线和全部参数",
     themeTip:"切换亮色 / 暗色", setTip:"设置中心",
     secModel:"模 型", secScene:"画 面", secParams:"参 数 · 全部可调",
-    mZs:"中文原生 · 极慢", mTs:"极速 · 推荐", mXs:"高清 · 英文",
+    subZimage:"中文原生 · 极慢", subFast:"极速 · 推荐", subXl:"高清 · 英文", subSd15:"经典 512px", subGeneric:"通用预设",
     labelPrompt:"提示词（中文直接写，越具体越好）",
     promptPh:"例：一只橘猫坐在窗台上，窗外雨后的街道有霓虹灯倒影，电影感光影，超高清细节",
     labelNeg:"负向词（CFG 大于 1 时生效）",
     labelSize:"尺寸", wTitle:"宽", hTitle:"高",
     labelSteps:"步数", labelCfg:"CFG 强度", labelBatch:"一次张数",
     labelSampler:"采样器", labelSched:"调度器", labelSeed:"种子（0 = 随机）",
-    randSeed:"换随机种子", upLabel:"追加 RealESRGAN 超分放大 ×4",
+    randSeed:"换随机种子", upLabel:"追加 AI 超分放大 ×4",
     go:"生 成", save:"保存全部原图到本地",
     emptyTitle:"—— 生 成 结 果 ——", emptySub:"点击图片可放大查看",
     histTitle:"出图历史",
@@ -372,8 +368,11 @@ const I18N = {
     footerBrand:"闪电研究院 Lightning Research Institute · 出品",
     footerLocal:"本地运行 · 不上传任何数据",
     noteZimage:"Z-Image（阿里通义 · 中文原生）：画质好、写啥画啥，但本机 16GB 实测每步约 12 分钟、一张近 90 分钟，仅在你愿意长时间等待时使用。",
-    noteTurbo:"Turbo 极速（推荐）：约 5–60 秒出图。直接写中文即可——页面会自动翻译成英文提交，写啥画啥。",
-    noteSdxl:"SDXL 高清：原生 1024、画质上限高，约 5–15 分钟，中文同样自动翻译。",
+    noteFast:"极速型模型（自动识别，如 Turbo/Lightning/Hyper）：约 5–60 秒出图，推荐 4 步 / CFG 1.0。中文会自动翻译成英文提交。",
+    noteSdxl:"高清型模型（自动识别 SDXL 类）：原生 1024、画质上限高，约 5–15 分钟，推荐 25 步 / CFG 7。中文同样自动翻译。",
+    noteSd15:"经典型模型（自动识别 SD 1.5 类）：原生 512–768，约 30–90 秒，推荐 20 步 / CFG 7。",
+    noteGeneric:"通用模型（自动识别）：预设 20 步 / CFG 6.5，若你了解该模型可自由调整参数。",
+    autoDetect:"下方模型由本机自动识别生成，无任何内置清单",
     sizeSquare:"方形", sizeLand:"横版", sizePort:"竖版",
     needPrompt:"请先输入画面描述", translated:"已自动翻译为英文：",
     tDegraded:"翻译服务不可用（离线或超时），已按原文提交",
@@ -392,19 +391,19 @@ const I18N = {
     confirmClear:"确认清空全部出图历史？",
   },
   en: {
-    appTitle:"Lightning Image Studio", appSub:"Fast local AI imaging · v4.0",
+    appTitle:"Lightning Image Studio", appSub:"Fast local AI imaging · v4.1",
     svcChecking:"Checking service…", svcOnline:"Service online", svcOffline:"Service offline · run the launcher",
     origBtn:"ComfyUI UI", origBtnTip:"Open the original ComfyUI workflow panel in a new tab",
     themeTip:"Toggle light / dark", setTip:"Settings",
     secModel:"MODEL", secScene:"PROMPT", secParams:"PARAMETERS · ALL ADJUSTABLE",
-    mZs:"Native Chinese · slow", mTs:"Fast · recommended", mXs:"Hi-Res · English",
+    subZimage:"Native Chinese · slow", subFast:"Fast · recommended", subXl:"Hi-Res · English", subSd15:"Classic 512px", subGeneric:"Generic preset",
     labelPrompt:"Prompt (any language, be specific)",
     promptPh:"e.g. An orange cat on a windowsill, neon reflections on rainy street, cinematic light, ultra detailed",
     labelNeg:"Negative prompt (effective when CFG > 1)",
     labelSize:"Size", wTitle:"Width", hTitle:"Height",
     labelSteps:"Steps", labelCfg:"CFG strength", labelBatch:"Batch size",
     labelSampler:"Sampler", labelSched:"Scheduler", labelSeed:"Seed (0 = random)",
-    randSeed:"Randomize", upLabel:"Add RealESRGAN ×4 upscale",
+    randSeed:"Randomize", upLabel:"Add AI ×4 upscale",
     go:"GENERATE", save:"Save all originals",
     emptyTitle:"—— R E S U L T S ——", emptySub:"Click an image to zoom",
     histTitle:"History",
@@ -423,8 +422,11 @@ const I18N = {
     footerBrand:"By Lightning Research Institute",
     footerLocal:"Runs locally · No data uploaded",
     noteZimage:"Z-Image (Alibaba Tongyi, native Chinese): great quality and prompt fidelity, but ~12 min per step on 16GB (≈90 min per image). Use only if you are willing to wait.",
-    noteTurbo:"Turbo (recommended): ~5–60s per image. Write in any language — auto-translated to English before submitting.",
-    noteSdxl:"SDXL Hi-Res: native 1024px, higher quality ceiling, ~5–15 min. Auto-translated as well.",
+    noteFast:"Fast model (auto-detected, e.g. Turbo/Lightning/Hyper): ~5–60s per image, recommended preset 4 steps / CFG 1.0. Prompts auto-translated to English.",
+    noteSdxl:"SDXL-class model (auto-detected): native 1024px, higher quality ceiling, ~5–15 min. Recommended 25 steps / CFG 7. Auto-translated as well.",
+    noteSd15:"Classic SD 1.5 model (auto-detected): native 512–768px, ~30–90s. Recommended 20 steps / CFG 7.",
+    noteGeneric:"Generic model (auto-detected): preset 20 steps / CFG 6.5 — tune freely if you know this model.",
+    autoDetect:"Models below are auto-detected from your machine — no built-in list",
     sizeSquare:"Square", sizeLand:"Landscape", sizePort:"Portrait",
     needPrompt:"Please enter a prompt first", translated:"Auto-translated: ",
     tDegraded:"Translation unavailable (offline/timeout), submitted as-is",
@@ -443,7 +445,7 @@ const I18N = {
     confirmClear:"Clear all generation history?",
   }
 };
-const DEF_SETTINGS = {lang:"zh", theme:"auto", autoT:true, defModel:"turbo", defUp:false, hist:30};
+const DEF_SETTINGS = {lang:"zh", theme:"auto", autoT:true, defModel:"", defUp:false, hist:30};
 let S = {...DEF_SETTINGS};
 try{ S = {...DEF_SETTINGS, ...(JSON.parse(localStorage.getItem("sd-settings-v4"))||{})}; }catch(e){}
 function saveS(){ localStorage.setItem("sd-settings-v4", JSON.stringify(S)); }
@@ -473,7 +475,9 @@ function applyLang(){
     el.title = t(el.dataset.i18nTitle);
   });
   $("langBtn").textContent = L()==="zh" ? "EN" : "中文";
-  $("modelNote").textContent = t("note"+{zimage:"Zimage",turbo:"Turbo",sdxl:"Sdxl"}[mode]);
+  const mc = curC();
+  $("modelNote").textContent = mc ? t(PRESET[mc.cls].noteKey) : t("sysLoading");
+  renderModelButtons();
   applyMode(true);
   renderHistory();
   renderSys();   // 系统信息卡随语言刷新
@@ -491,11 +495,20 @@ $("themeBtn").onclick = ()=>{
 };
 
 /* ───────── 设置中心 ───────── */
+function populateDefModel(){
+  if(!MODELS.length) return;
+  $("setDefModel").innerHTML = MODELS.map(m=>
+    `<option value="${m.key.replace(/"/g,"")}">${shortName(m)}</option>`).join("");
+}
 function syncSettingsUI(){
   $("setLang").value = S.lang;
   $("setTheme").value = S.theme;
   $("setAutoT").checked = S.autoT;
-  $("setDefModel").value = S.defModel;
+  if(MODELS.length){
+    if(!MODELS.some(m=>m.key===S.defModel)){ S.defModel = MODELS[0].key; saveS(); }
+    populateDefModel();
+    $("setDefModel").value = S.defModel;
+  }
   $("setDefUp").checked = S.defUp;
   $("setHist").value = String(S.hist);
 }
@@ -509,7 +522,9 @@ $("setDefModel").onchange = e=>{ S.defModel = e.target.value; saveS(); };
 $("setDefUp").onchange = e=>{ S.defUp = e.target.checked; saveS(); };
 $("setHist").onchange = e=>{ S.hist = Number(e.target.value); saveS(); renderHistory(); };
 $("setReset").onclick = ()=>{ S = {...DEF_SETTINGS, lang:S.lang, theme:S.theme}; saveS();
-  applyTheme(); applyLang(); mode = S.defModel; applyMode(false); syncSettingsUI(); renderHistory(); };
+  applyTheme(); applyLang();
+  if(MODELS.length){ mode = MODELS.some(m=>m.key===S.defModel) ? S.defModel : MODELS[0].key; applyMode(false); }
+  syncSettingsUI(); renderHistory(); };
 
 $("langBtn").onclick = ()=>{ S.lang = L()==="zh" ? "en" : "zh"; saveS(); applyLang(); };
 
@@ -568,14 +583,23 @@ function renderHistory(){
 /* ───────── 模型 / 参数 ───────── */
 const SAMPLERS = ["euler","euler_ancestral","dpmpp_2m","dpmpp_2m_sde","dpmpp_3m_sde","dpm_2","dpm_2_ancestral","heun","ddim","uni_pc","lcm","res_multistep"];
 const SCHEDS = ["simple","normal","karras","sgm_uniform","exponential","beta"];
-const AVAIL = {zimage:false, turbo:false, sdxl:false};   // 由系统识别结果填充
 
-const CFG = {
+/* 按文件名自动识别模型类型，匹配对应参数方案（不依赖任何内置模型清单） */
+function classifyCkpt(name){
+  const n = name.toLowerCase();
+  if(/(turbo|lightning|hyper|lcm|ssd-1b|sdxl_turbo|flux.*schnell)/.test(n)) return "fast";
+  if(/xl/.test(n)) return "xl";
+  if(/(v1-5|sd15|sd_1\.5|sd-v1|stable[-_]?diffusion[-_]?v?1)/.test(n)) return "sd15";
+  return "generic";
+}
+
+/* 各类型参数方案；build(ckpt,w,h,bs) 构建工作流 */
+const PRESET = {
   zimage: {
-    noteKey:"noteZimage",
+    noteKey:"noteZimage", subKey:"subZimage",
     sizes: [["1024x1024","sizeSquare"],["1440x720","sizeLand"],["720x1440","sizePort"],["1280x960","sizeLand"]],
     steps: 8, cfg: 1.0, sampler: "euler", sched: "simple",
-    build: (w,h,bs) => ({
+    build: (_ck,w,h,bs) => ({
       "1":{class_type:"UNETLoader",inputs:{unet_name:"z_image_turbo_int8_convrot.safetensors",weight_dtype:"default"}},
       "2":{class_type:"CLIPLoader",inputs:{clip_name:"qwen_3_4b_fp8_mixed.safetensors",type:"stable_diffusion",device:"default"}},
       "3":{class_type:"VAELoader",inputs:{vae_name:"z_image_ae.safetensors"}},
@@ -584,55 +608,82 @@ const CFG = {
       "6":{class_type:"EmptyLatentImage",inputs:{width:w,height:h,batch_size:bs}}
     }), latentNode:"6", posNode:"4", negNode:"5", extraId:7
   },
-  turbo: {
-    noteKey:"noteTurbo",
+  fast: {
+    noteKey:"noteFast", subKey:"subFast",
     sizes: [["512x512","sizeSquare"],["768x512","sizeLand"],["512x768","sizePort"],["768x768","sizeSquare"]],
     steps: 4, cfg: 1.0, sampler: "euler_ancestral", sched: "simple",
-    build: (w,h,bs) => ({
-      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:"sd_turbo.safetensors"}},
+    build: (ck,w,h,bs) => ({
+      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:ck}},
       "2":{class_type:"CLIPTextEncode",inputs:{text:$("prompt").value.trim(),clip:["1",1]}},
       "3":{class_type:"CLIPTextEncode",inputs:{text:$("neg").value,clip:["1",1]}},
       "4":{class_type:"EmptyLatentImage",inputs:{width:w,height:h,batch_size:bs}}
     }), latentNode:"4", posNode:"2", negNode:"3", extraId:5
   },
-  sdxl: {
-    noteKey:"noteSdxl",
+  xl: {
+    noteKey:"noteSdxl", subKey:"subXl",
     sizes: [["1024x1024","sizeSquare"],["1792x1024","sizeLand"],["1024x1792","sizePort"]],
     steps: 25, cfg: 7.0, sampler: "dpmpp_2m", sched: "karras",
-    build: (w,h,bs) => ({
-      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:"sd_xl_base_1.0.safetensors"}},
+    build: (ck,w,h,bs) => ({
+      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:ck}},
+      "2":{class_type:"CLIPTextEncode",inputs:{text:$("prompt").value.trim(),clip:["1",1]}},
+      "3":{class_type:"CLIPTextEncode",inputs:{text:$("neg").value,clip:["1",1]}},
+      "4":{class_type:"EmptyLatentImage",inputs:{width:w,height:h,batch_size:bs}}
+    }), latentNode:"4", posNode:"2", negNode:"3", extraId:5
+  },
+  sd15: {
+    noteKey:"noteSd15", subKey:"subSd15",
+    sizes: [["512x512","sizeSquare"],["768x512","sizeLand"],["512x768","sizePort"]],
+    steps: 20, cfg: 7.0, sampler: "dpmpp_2m", sched: "karras",
+    build: (ck,w,h,bs) => ({
+      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:ck}},
+      "2":{class_type:"CLIPTextEncode",inputs:{text:$("prompt").value.trim(),clip:["1",1]}},
+      "3":{class_type:"CLIPTextEncode",inputs:{text:$("neg").value,clip:["1",1]}},
+      "4":{class_type:"EmptyLatentImage",inputs:{width:w,height:h,batch_size:bs}}
+    }), latentNode:"4", posNode:"2", negNode:"3", extraId:5
+  },
+  generic: {
+    noteKey:"noteGeneric", subKey:"subGeneric",
+    sizes: [["768x768","sizeSquare"],["1024x640","sizeLand"],["640x1024","sizePort"]],
+    steps: 20, cfg: 6.5, sampler: "dpmpp_2m", sched: "karras",
+    build: (ck,w,h,bs) => ({
+      "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:ck}},
       "2":{class_type:"CLIPTextEncode",inputs:{text:$("prompt").value.trim(),clip:["1",1]}},
       "3":{class_type:"CLIPTextEncode",inputs:{text:$("neg").value,clip:["1",1]}},
       "4":{class_type:"EmptyLatentImage",inputs:{width:w,height:h,batch_size:bs}}
     }), latentNode:"4", posNode:"2", negNode:"3", extraId:5
   }
 };
-const MODE_PREFIX = {zimage:"闪电生图_Z", turbo:"闪电生图_T", sdxl:"闪电生图_X"};
+const CLS_ORDER = {fast:0, xl:1, sd15:2, generic:3, zimage:4};
+let MODELS = [];          /* 由系统自动识别填充：{key, ckpt, cls} */
+let mode = null;          /* 当前选中的模型 key */
+let UP_NAME = "";         /* 自动识别到的超分模型 */
+const curC = () => MODELS.find(m=>m.key===mode);
+const shortName = m => m.cls==="zimage" ? "Z-Image"
+  : m.ckpt.replace(/\.(safetensors|sft|ckpt|pt|pth|bin)$/i,"").replace(/_/g," ").slice(0,20);
+
+function renderModelButtons(){
+  const box = $("modelBtns");
+  box.innerHTML = MODELS.map(m=>
+    `<button data-key="${m.key.replace(/"/g,"")}" title="${m.ckpt.replace(/"/g,"")||"Z-Image"}">${shortName(m)}<small>${t(PRESET[m.cls].subKey)}</small></button>`).join("");
+  box.querySelectorAll("button").forEach(b=>b.onclick=()=>{ mode=b.dataset.key; applyMode(false); });
+}
 
 function fillSel(id, list, cur){
   $(id).innerHTML = list.map(s=>`<option ${s===cur?"selected":""}>${s}</option>`).join("");
 }
 function applyMode(keepCustom){
-  const c = CFG[mode];
-  $("modelNote").textContent = t(c.noteKey);
-  $("sizePreset").innerHTML = c.sizes.map(s=>
+  const m = curC(); if(!m) return;
+  const p = PRESET[m.cls];
+  $("modelNote").textContent = t(p.noteKey);
+  $("sizePreset").innerHTML = p.sizes.map(s=>
     `<option value="${s[0]}">${t(s[1])} ${s[0].replace("x","×")}</option>`).join("");
   if(!keepCustom){ const parts = $("sizePreset").value.split("x");
     $("w").value=parts[0]; $("h").value=parts[1];
-    $("steps").value=c.steps; $("cfg").value=c.cfg;
-    fillSel("sampler",SAMPLERS,c.sampler); fillSel("sched",SCHEDS,c.sched); }
-  $("mZ").classList.toggle("on",mode==="zimage");
-  $("mT").classList.toggle("on",mode==="turbo");
-  $("mX").classList.toggle("on",mode==="sdxl");
+    $("steps").value=p.steps; $("cfg").value=p.cfg;
+    fillSel("sampler",SAMPLERS,p.sampler); fillSel("sched",SCHEDS,p.sched); }
+  document.querySelectorAll("#modelBtns button").forEach(b=>
+    b.classList.toggle("on", b.dataset.key===mode));
 }
-function markAvail(){
-  for(const [id,key] of [["mZ","zimage"],["mT","turbo"],["mX","sdxl"]]){
-    $(id).classList.toggle("na", !AVAIL[key]);
-  }
-}
-$("mZ").onclick=()=>{ if(AVAIL.zimage){mode="zimage";applyMode(false)} };
-$("mT").onclick=()=>{ if(AVAIL.turbo){mode="turbo";applyMode(false)} };
-$("mX").onclick=()=>{ if(AVAIL.sdxl){mode="sdxl";applyMode(false)} };
 $("sizePreset").onchange=()=>{const p=$("sizePreset").value.split("x");$("w").value=p[0];$("h").value=p[1]};
 $("rand").onclick=()=>$("seed").value=Math.floor(Math.random()*1e9);
 
@@ -661,12 +712,17 @@ async function loadSystemInfo(){
     SYS = await r.json();
     if(SYS.backend_online){
       $("svcDot").classList.add("ok"); $("svcTxt").textContent = t("svcOnline");
-      // 模型可用性自动识别
-      const names = (SYS.checkpoints||[]).join(" ");
-      AVAIL.turbo = names.includes("sd_turbo") || (SYS.checkpoints||[]).some(n=>n.includes("turbo"));
-      AVAIL.sdxl = (SYS.checkpoints||[]).some(n=>n.includes("xl"));
-      AVAIL.zimage = (SYS.components||[]).length >= 3;
-      markAvail();
+      /* 全自动识别本机模型：检测到什么就提供什么，不依赖内置清单 */
+      MODELS = (SYS.checkpoints||[]).map(n=>({key:"ck:"+n, ckpt:n, cls:classifyCkpt(n)}));
+      if((SYS.components||[]).length >= 3) MODELS.push({key:"zimage", ckpt:"", cls:"zimage"});
+      MODELS.sort((a,b)=>CLS_ORDER[a.cls]-CLS_ORDER[b.cls]);
+      mode = MODELS.some(m=>m.key===S.defModel) ? S.defModel : (MODELS[0]&&MODELS[0].key);
+      renderModelButtons(); applyMode(false); populateDefModel();
+      /* 超分模型自动识别 */
+      const ups = SYS.upscale_models || [];
+      UP_NAME = ups.find(u=>/realesrgan|esrgan|4x|ultrasharp/i.test(u)) || ups[0] || "";
+      $("up").disabled = !ups.length;
+      if(!ups.length) $("up").parentElement.style.opacity = .45;
     } else {
       $("svcTxt").textContent = t("svcOffline");
     }
@@ -691,7 +747,8 @@ async function api(path, opt){
 /* ───────── 自动翻译（可在设置中关闭；失败自动降级） ───────── */
 const hasCJK = s => /[\u3400-\u9fbf\u3000-\u303f\uff01-\uff5e]/.test(s);
 async function toEN(text, label){
-  if(mode === "zimage" || !S.autoT || !text || !hasCJK(text)) return {text, degraded:false};
+  const mc = curC();
+  if((mc && mc.cls==="zimage") || !S.autoT || !text || !hasCJK(text)) return {text, degraded:false};
   try{
     const d = await api("/translate", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({text})});
@@ -709,7 +766,8 @@ async function toEN(text, label){
 $("go").onclick = async () => {
   let prompt = $("prompt").value.trim();
   if(!prompt){ setStatus('<span class="err">'+t("needPrompt")+'</span>'); return; }
-  const c = CFG[mode];
+  const m = curC(); if(!m){ setStatus('<span class="err">'+t("sysLoading")+'</span>'); return; }
+  const p = PRESET[m.cls];
   const w = Math.max(64, Math.min(4096, Math.floor(Number($("w").value)||1024)));
   const h = Math.max(64, Math.min(4096, Math.floor(Number($("h").value)||1024)));
   const bs = Number($("batch").value);
@@ -736,17 +794,18 @@ $("go").onclick = async () => {
 
   let wf;
   try{
-    wf = c.build(w, h, bs);
-    const kid = c.extraId, did = kid+1, sid = did+1, uid = sid+1;
+    wf = p.build(m.ckpt, w, h, bs);
+    const kid = p.extraId, did = kid+1, sid = did+1, uid = sid+1;
     wf[String(kid)]={class_type:"KSampler",inputs:{seed:seed,steps:steps,cfg:cfgv,
       sampler_name:$("sampler").value,scheduler:$("sched").value,denoise:1,
-      model:["1",0],positive:[c.posNode,0],negative:[c.negNode,0],latent_image:[c.latentNode,0]}};
+      model:["1",0],positive:[p.posNode,0],negative:[p.negNode,0],latent_image:[p.latentNode,0]}};
     wf[String(did)]={class_type:"VAEDecode",inputs:{samples:[String(kid),0],vae:["1",2]}};
-    wf[String(sid)]={class_type:"SaveImage",inputs:{images:[String(did),0],filename_prefix:MODE_PREFIX[mode]}};
-    if($("up").checked){
-      wf[String(uid)]={class_type:"UpscaleModelLoader",inputs:{model_name:"RealESRGAN_x4plus.pth"}};
+    const prefix = "闪电生图_" + (m.cls==="zimage" ? "Z" : m.ckpt.split(".")[0].replace(/[^A-Za-z0-9]/g,"").slice(0,10) || "M");
+    wf[String(sid)]={class_type:"SaveImage",inputs:{images:[String(did),0],filename_prefix:prefix}};
+    if($("up").checked && UP_NAME){
+      wf[String(uid)]={class_type:"UpscaleModelLoader",inputs:{model_name:UP_NAME}};
       wf[String(uid+1)]={class_type:"ImageUpscaleWithModel",inputs:{upscale_model:[String(uid),0],image:[String(did),0]}};
-      wf[String(uid+2)]={class_type:"SaveImage",inputs:{images:[String(uid+1),0],filename_prefix:MODE_PREFIX[mode]+"_放大"}};
+      wf[String(uid+2)]={class_type:"SaveImage",inputs:{images:[String(uid+1),0],filename_prefix:prefix+"_放大"}};
     }
   }catch(e){
     setStatus('<span class="err">'+t("buildErr")+String(e.message||e).slice(0,200)+'</span>');
@@ -808,9 +867,7 @@ $("save").onclick = () => {
 };
 
 /* ───────── 初始化 ───────── */
-mode = CFG[S.defModel] ? S.defModel : "turbo";
 applyTheme();
-applyMode(false);
 $("up").checked = S.defUp;
 applyLang();
 loadSystemInfo();

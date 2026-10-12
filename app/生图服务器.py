@@ -21,7 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "4.0.0"
+VERSION = "4.1.0"
 BACKEND = "http://127.0.0.1:8188"
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(HERE, "一键生图.html")
@@ -74,21 +74,27 @@ def collect_system_info():
     name = dev.get("name") or ""
     info["device"] = ("%s · %.0fGB" % (name, vram / 1024 ** 3)) if vram else name or "CPU/MPS"
 
-    def names(node_cls):
+    def names(node_cls, field):
+        """兼容新旧 object_info 格式：
+        旧: [["a","b"], {...}]  新: ["COMBO", {"options": [...]}]"""
         d = backend_get("/object_info/" + node_cls)
         try:
-            return d[node_cls]["input"]["required"]["ckpt_name" if node_cls == "CheckpointLoaderSimple"
-                    else ("unet_name" if node_cls == "UNETLoader"
-                          else ("clip_name" if node_cls == "CLIPLoader" else "vae_name"))][0]
+            spec = d[node_cls]["input"]["required"][field]
+            if isinstance(spec, list) and spec:
+                if spec[0] == "COMBO" and len(spec) > 1:
+                    return list(spec[1].get("options") or [])
+                return list(spec[0] or [])
+            return []
         except Exception:
             return []
 
-    info["checkpoints"] = sorted(names("CheckpointLoaderSimple"))
+    info["checkpoints"] = sorted(names("CheckpointLoaderSimple", "ckpt_name"))
     comps = []
-    comps += ["DiT:" + n for n in names("UNETLoader")]
-    comps += ["编码器:" + n for n in names("CLIPLoader")]
-    comps += ["VAE:" + n for n in names("VAELoader")]
+    comps += ["DiT:" + n for n in names("UNETLoader", "unet_name")]
+    comps += ["编码器:" + n for n in names("CLIPLoader", "clip_name")]
+    comps += ["VAE:" + n for n in names("VAELoader", "vae_name")]
     info["components"] = comps
+    info["upscale_models"] = sorted(names("UpscaleModelLoader", "model_name"))
 
     root = find_comfy_root()
     plugins = []
