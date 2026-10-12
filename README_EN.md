@@ -8,6 +8,28 @@
 
 A visual control panel on top of a local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) installation. No nodes, no wiring — just type a prompt in any language and generate. The original ComfyUI workflow UI stays one click away.
 
+## 🖼 Screenshots
+
+**Main panel (light / dark, one-click switch)** — full parameter console on the left, results & history on the right:
+
+| Light | Dark |
+|---|---|
+| ![Light panel](docs/screenshots/panel-light-zh.png) | ![Dark panel](docs/screenshots/panel-dark-zh.png) |
+
+**Terminal one-click installer** — formal interactive flow: license → environment check → auto-detection, Y/N at every step:
+
+![Installer](docs/screenshots/installer.png)
+
+**System info · auto-detected** — the panel scans and lists ComfyUI version, PyTorch, device, **all local models**, **custom nodes** and queue status on launch:
+
+![System info](docs/screenshots/sysinfo.png)
+
+**Settings center** — language, theme, translation, default model, upscale, history size; all persisted locally:
+
+| Settings | English UI |
+|---|---|
+| ![Settings](docs/screenshots/settings.png) | ![English UI](docs/screenshots/panel-en-dark.png) |
+
 ## ✨ Features
 
 - **One-click install**: interactive terminal installer (Y/N), auto-detects environment, finds your local ComfyUI and models, downloads missing models from mirrors
@@ -22,7 +44,7 @@ A visual control panel on top of a local [ComfyUI](https://github.com/comfyanony
 ## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/<your-username>/lightning-image-studio.git
+git clone https://github.com/sumuellovingjesus-hub/lightning-image-studio.git
 cd lightning-image-studio
 python3 install.py
 ```

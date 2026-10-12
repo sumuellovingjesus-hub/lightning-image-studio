@@ -8,6 +8,28 @@
 
 一个部署在本机 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) 之上的可视化控制面板。不懂节点、不用连线，中文描述直接出图；同时保留一键跳转 ComfyUI 原版工作流界面的入口。
 
+## 🖼 界面预览
+
+**主界面（亮色 / 暗色，一键切换）** —— 左侧全参数控制台，右侧生成结果与出图历史：
+
+| 亮色 | 暗色 |
+|---|---|
+| ![亮色主界面](docs/screenshots/panel-light-zh.png) | ![暗色主界面](docs/screenshots/panel-dark-zh.png) |
+
+**终端一键安装器** —— 正式交互流程：许可确认 → 环境检测 → 自动识别，全程 Y/N 确认，每一步都告诉你它在做什么：
+
+![一键安装器](docs/screenshots/installer.png)
+
+**系统信息 · 自动识别** —— 打开页面即自动扫描并列出：ComfyUI 版本、PyTorch 环境、显卡/内存、**本机全部可用模型**、**已装插件**、当前队列状态，零配置：
+
+![系统信息自动识别](docs/screenshots/sysinfo.png)
+
+**设置中心** —— 语言、主题、自动翻译、默认模型、默认超分、历史记录条数，全部可设置、全部本机记忆：
+
+| 设置中心 | 英文界面 |
+|---|---|
+| ![设置中心](docs/screenshots/settings.png) | ![英文界面](docs/screenshots/panel-en-dark.png) |
+
 ## ✨ 特性
 
 - **一键安装**：终端交互式安装器（Y/N 确认），自动检测环境、自动识别本机 ComfyUI 与模型，缺失模型可自动下载（国内镜像）
@@ -22,7 +44,7 @@
 ## 🚀 快速开始
 
 ```bash
-git clone https://github.com/<你的用户名>/lightning-image-studio.git
+git clone https://github.com/sumuellovingjesus-hub/lightning-image-studio.git
 cd lightning-image-studio
 python3 install.py
 ```
@@ -33,7 +55,14 @@ python3 install.py
 安装闪电生图台.command
 ```
 
-安装器会引导你完成：环境检测 → ComfyUI 识别（未安装可自动全新安装）→ 模型识别与补全 → 面板安装 → 启动。
+安装器会引导你完成：环境检测 → ComfyUI 识别（未安装可自动全新安装）→ 模型识别与补全 → 面板安装 → 启动。全程只需按 `Y` / `N`：
+
+1. **许可确认** —— MIT 开源许可 + 隐私说明（本地运行、不收集数据）
+2. **环境检测** —— 系统 / Python / 磁盘 / 内存逐项检查，不达标会明确警告
+3. **识别 ComfyUI** —— 自动扫描常见安装位置 + Spotlight 搜索；找不到时可手动指定路径，或让安装器自动全新安装（克隆源码 → 虚拟环境 → PyTorch，国内镜像加速）
+4. **识别模型** —— 自动列出已就位模型（含体积），缺失的逐个询问是否下载（ModelScope 镜像 + 多源回退 + 进度条 + SHA-256 记录）
+5. **安装面板** —— 自动探测带 PyTorch 的 Python 作后端；小内存机器自动启用低显存参数；生成配置与启动器
+6. **汇总确认 → 完成** —— 展示全部安装结果，可选立即启动
 
 日常使用：双击生成的 `启动闪电生图台.command`，浏览器自动打开 `http://127.0.0.1:8190`。
 
